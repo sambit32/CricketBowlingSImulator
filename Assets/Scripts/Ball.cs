@@ -2,17 +2,6 @@ using UnityEngine;
 
 public class Ball : MonoBehaviour
 {
-    public enum BallType
-    {
-        Swing,
-        Spin
-    }
-
-    public enum Direction
-    {
-        Left = -1,
-        Right = 1
-    }
 
     [Header("Ball Type")]
     public BallType ballType = BallType.Swing;
@@ -90,7 +79,7 @@ public class Ball : MonoBehaviour
         isSwingActive = false;
         timeInAir = 0f;
     }
-
+    [SerializeField] private Vector3 LaunchVelocity = Vector3.zero;
     public void LaunchBall()
     {
         ResetBall();
@@ -106,6 +95,8 @@ public class Ball : MonoBehaviour
             }
         }
         Vector3 velocity = CalculateLaunchVelocity();
+
+        LaunchVelocity = velocity; // For debugging/visualization
 
         rb.isKinematic = false;
         rb.linearVelocity = velocity;
@@ -175,7 +166,8 @@ public class Ball : MonoBehaviour
 
                 // Smooth reduction near pitch edges
                 float distanceFromCenter = Mathf.Abs(pos.x);
-                float edgeFactor = Mathf.InverseLerp(pitchHalfWidth, 0f, distanceFromCenter);
+                float t = Mathf.InverseLerp(pitchHalfWidth, 0f, distanceFromCenter);
+                float edgeFactor = Mathf.SmoothStep(0f, 1f, t);
                 swingFactor *= edgeFactor;
 
                 Vector3 velocityDir = vel.normalized;
@@ -227,7 +219,8 @@ public class Ball : MonoBehaviour
 
         // Smooth edge reduction
         float distanceFromCenter = Mathf.Abs(transform.position.x);
-        float edgeFactor = Mathf.InverseLerp(pitchHalfWidth, 0f, distanceFromCenter);
+        float t = Mathf.InverseLerp(pitchHalfWidth, 0f, distanceFromCenter);
+        float edgeFactor = Mathf.SmoothStep(0f, 1f, t);
         swingFactor *= edgeFactor;
 
         Vector3 velocity = rb.linearVelocity;
@@ -316,6 +309,7 @@ public class Ball : MonoBehaviour
 
         float distanceXZ = toTargetXZ.magnitude;
         float height = toTarget.y;
+        height = Mathf.Abs(height); // Consider only positive height for reachability
 
         float speedSquared = speed * speed;
 
