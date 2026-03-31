@@ -628,15 +628,19 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 871500151644019349, guid: 2080945a9772e654c9430f22ef5ac5f8, type: 3}
       propertyPath: speed
-      value: 50
+      value: 60
+      objectReference: {fileID: 0}
+    - target: {fileID: 871500151644019349, guid: 2080945a9772e654c9430f22ef5ac5f8, type: 3}
+      propertyPath: swingDirection
+      value: -1
       objectReference: {fileID: 0}
     - target: {fileID: 871500151644019349, guid: 2080945a9772e654c9430f22ef5ac5f8, type: 3}
       propertyPath: launchAngleVertical
-      value: 30
+      value: 10
       objectReference: {fileID: 0}
     - target: {fileID: 871500151644019349, guid: 2080945a9772e654c9430f22ef5ac5f8, type: 3}
       propertyPath: launchAngleHorizontal
-      value: 10
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5551024249713704943, guid: 2080945a9772e654c9430f22ef5ac5f8, type: 3}
       propertyPath: m_Constraints

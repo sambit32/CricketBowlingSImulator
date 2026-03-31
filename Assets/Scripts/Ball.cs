@@ -5,40 +5,51 @@ public class Ball : MonoBehaviour
     [Header("Throw Settings")]
     public float speed = 20f;
     public float launchAngleVertical = 10f;
-    public float launchAngleHorizontal = 10f;
+    public float launchAngleHorizontal = 0f;
+
+    [Header("Swing Settings")]
+    public float swingStrength = 2f;     // how strong the swing is
+    public int swingDirection = 1;       // +1 right, -1 left
+    public float maxSwing = 5f;          // clamp for realism
 
     private Rigidbody rb;
 
     private Vector3 initialPosition;
+
+    private bool hasBounced = false;
+    private bool isSwingActive = false;
+    private float timeInAir = 0f;
 
     void Start()
     {
         initialPosition = transform.position;
         rb = GetComponent<Rigidbody>();
         rb.isKinematic = true;
-
-        isReseted = true;
     }
-    private bool isReseted = false;
+
     public void ResetBall()
     {
-        if (isReseted)
-        {
-            return;
-        }
+        // First enable physics temporarily to safely reset velocity
+        rb.isKinematic = false;
+
         rb.linearVelocity = Vector3.zero;
         rb.angularVelocity = Vector3.zero;
+
+        // Then disable physics
         rb.isKinematic = true;
 
         transform.position = initialPosition;
 
-        isReseted = true;
+        // Reset states
+        hasBounced = false;
+        isSwingActive = false;
+        timeInAir = 0f;
     }
 
     public void LaunchBall()
     {
-        hasBounced = false; // IMPORTANT (reset bounce state)
-        
+        ResetBall();
+
         float angleRad = launchAngleVertical * Mathf.Deg2Rad;
 
         // Apply horizontal angle
@@ -50,17 +61,46 @@ public class Ball : MonoBehaviour
 
         rb.isKinematic = false;
         rb.linearVelocity = velocity;
-        isReseted = false;
+
+        // Activate swing
+        isSwingActive = true;
+        timeInAir = 0f;
     }
 
-    private bool hasBounced = false;
+    void FixedUpdate()
+    {
+        if (isSwingActive && !hasBounced)
+        {
+            ApplySwing();
+        }
+    }
+
+    void ApplySwing()
+    {
+        timeInAir += Time.fixedDeltaTime;
+
+        // Gradual increase
+        float swingFactor = timeInAir * swingStrength;
+        swingFactor = Mathf.Clamp(swingFactor, 0, maxSwing);
+
+        // Side direction (based on current movement, not transform)
+        Vector3 velocityDir = rb.linearVelocity.normalized;
+        Vector3 sideDir = Vector3.Cross(Vector3.up, velocityDir).normalized * swingDirection;
+
+        // Apply small sideways force
+        rb.linearVelocity += sideDir * swingFactor * Time.fixedDeltaTime;
+    }
 
     private void OnCollisionEnter(Collision collision)
     {
         if (!hasBounced && collision.gameObject.CompareTag("Ground"))
         {
             hasBounced = true;
-            Debug.Log("Ball bounced!");
+
+            // STOP swing instantly
+            isSwingActive = false;
+
+            Debug.Log("Ball bounced - swing stopped");
         }
     }
 
