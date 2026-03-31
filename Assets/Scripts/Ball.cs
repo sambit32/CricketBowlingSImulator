@@ -17,10 +17,12 @@ public class Ball : MonoBehaviour
     [Header("Ball Type")]
     public BallType ballType = BallType.Swing;
 
+    [Header("References")]
+    public Transform aimTarget;
+    public Transform bounceMarker;
+
     [Header("Throw Settings")]
     public float speed = 20f;
-    public float launchAngleVertical = 10f;
-    public float launchAngleHorizontal = 0f;
 
     [Header("Swing Settings")]
     public float swingStrength = 2f;
@@ -28,13 +30,22 @@ public class Ball : MonoBehaviour
     public float maxSwing = 5f;
 
     [Header("Spin Settings")]
-    [Tooltip("Spin angle in degrees")]
-    [Range(0f, 25f)]
-    public float spinStrength = 10f;
+    [Range(0f, 20f)]
+    public float spinAngle = 10f;
     public Direction spinDirection = Direction.Right;
+
+    [Header("Pitch Limits")]
+    public float pitchHalfWidth = 1.5f;
+
+    [Header("Bounce Prediction")]
+    public float simulationTimeStep = 0.02f;
+    public int simulationSteps = 500;
+    public float groundY = 0f;
 
     private Rigidbody rb;
     private Vector3 initialPosition;
+    private SphereCollider sphereCollider;
+    private PhysicsMaterial originalMaterial;
 
     private bool hasBounced = false;
     private bool isSwingActive = false;
@@ -42,9 +53,32 @@ public class Ball : MonoBehaviour
 
     void Start()
     {
-        initialPosition = transform.position;
         rb = GetComponent<Rigidbody>();
+        initialPosition = transform.position;
         rb.isKinematic = true;
+        sphereCollider = GetComponent<SphereCollider>();
+        originalMaterial = sphereCollider != null ? sphereCollider.material : null;
+        UpdateBounceMarker();
+    }
+
+    void Update()
+    {
+        if (rb.isKinematic)
+        {
+            UpdateBounceMarker();
+        }
+    }
+
+    void UpdateBounceMarker()
+    {
+        Vector3 velocity = CalculateLaunchVelocity();
+        Vector3 bouncePoint = PredictBouncePoint(transform.position, velocity);
+
+        bounceMarker.position = new Vector3(
+            bouncePoint.x,
+            groundY,
+            bouncePoint.z
+        );
     }
 
     public void ResetBall()
@@ -60,23 +94,122 @@ public class Ball : MonoBehaviour
     public void LaunchBall()
     {
         ResetBall();
-
-        float angleRad = launchAngleVertical * Mathf.Deg2Rad;
-
-        Quaternion yawRotation = Quaternion.Euler(0f, launchAngleHorizontal, 0f);
-        Vector3 forward = yawRotation * transform.forward;
-
-        Vector3 velocity = forward * speed * Mathf.Cos(angleRad);
-        velocity.y = speed * Mathf.Sin(angleRad);
+        if(sphereCollider != null)
+        {
+            if(ballType == BallType.Swing)
+            {
+                sphereCollider.material = null;
+            }
+            else
+            {
+                sphereCollider.material = originalMaterial;
+            }
+        }
+        Vector3 velocity = CalculateLaunchVelocity();
 
         rb.isKinematic = false;
         rb.linearVelocity = velocity;
 
-        // Activate swing only if swing mode
         isSwingActive = (ballType == BallType.Swing);
         timeInAir = 0f;
     }
 
+    // ------------------ LAUNCH ------------------
+    Vector3 CalculateLaunchVelocity()
+    {
+        Vector3 start = transform.position;
+        Vector3 target = aimTarget.position;
+
+        float gravity = Mathf.Abs(Physics.gravity.y);
+
+        Vector3 toTarget = target - start;
+        Vector3 toTargetXZ = new Vector3(toTarget.x, 0, toTarget.z);
+
+        float distanceXZ = toTargetXZ.magnitude;
+        float height = toTarget.y;
+
+        float speedSquared = speed * speed;
+
+        float underRoot = speedSquared * speedSquared -
+            gravity * (gravity * distanceXZ * distanceXZ + 2 * height * speedSquared);
+
+        if (underRoot < 0)
+        {
+            Debug.LogWarning("Target too far/close for given speed");
+            return transform.forward * speed;
+        }
+
+        float root = Mathf.Sqrt(underRoot);
+
+        float angle = Mathf.Atan((speedSquared - root) / (gravity * distanceXZ));
+
+        Vector3 direction = toTargetXZ.normalized;
+
+        Vector3 velocity =
+            direction * speed * Mathf.Cos(angle) +
+            Vector3.up * speed * Mathf.Sin(angle);
+
+        return velocity;
+    }
+
+    // ------------------ PREDICTION ------------------
+    Vector3 PredictBouncePoint(Vector3 startPos, Vector3 initialVelocity)
+    {
+        Vector3 pos = startPos;
+        Vector3 vel = initialVelocity;
+
+        float simTime = 0f;
+
+        for (int i = 0; i < simulationSteps; i++)
+        {
+            simTime += simulationTimeStep;
+
+            // Gravity
+            vel += Physics.gravity * simulationTimeStep;
+
+            // Swing
+            if (ballType == BallType.Swing)
+            {
+                float swingFactor = simTime * swingStrength;
+                swingFactor = Mathf.Clamp(swingFactor, 0, maxSwing);
+
+                // Smooth reduction near pitch edges
+                float distanceFromCenter = Mathf.Abs(pos.x);
+                float edgeFactor = Mathf.InverseLerp(pitchHalfWidth, 0f, distanceFromCenter);
+                swingFactor *= edgeFactor;
+
+                Vector3 velocityDir = vel.normalized;
+                float speed = vel.magnitude;
+
+                int dir = (int)swingDirection;
+                Vector3 sideDir = Vector3.Cross(Vector3.up, velocityDir).normalized * dir;
+
+                Vector3 newDir = (velocityDir + sideDir * swingFactor * simulationTimeStep).normalized;
+                vel = newDir * speed;
+            }
+
+            // Move
+            pos += vel * simulationTimeStep;
+
+            // Hard clamp to pitch
+            if (Mathf.Abs(pos.x) > pitchHalfWidth)
+            {
+                pos.x = Mathf.Sign(pos.x) * pitchHalfWidth;
+                vel.x = 0f;
+            }
+
+            // Bounce detection
+            if (pos.y <= groundY)
+            {
+                pos.y = groundY;
+                return pos;
+            }
+        }
+
+        return pos;
+    }
+
+    // ------------------ REAL PHYSICS ------------------
     void FixedUpdate()
     {
         if (ballType == BallType.Swing && isSwingActive && !hasBounced)
@@ -92,61 +225,103 @@ public class Ball : MonoBehaviour
         float swingFactor = timeInAir * swingStrength;
         swingFactor = Mathf.Clamp(swingFactor, 0, maxSwing);
 
-        Vector3 velocityDir = rb.linearVelocity.normalized;
+        // Smooth edge reduction
+        float distanceFromCenter = Mathf.Abs(transform.position.x);
+        float edgeFactor = Mathf.InverseLerp(pitchHalfWidth, 0f, distanceFromCenter);
+        swingFactor *= edgeFactor;
 
-        // Perpendicular sideways direction
-        Vector3 sideDir = Vector3.Cross(Vector3.up, velocityDir).normalized * (int)swingDirection;
+        Vector3 velocity = rb.linearVelocity;
+        float speed = velocity.magnitude;
 
-        rb.linearVelocity += sideDir * swingFactor * Time.fixedDeltaTime;
+        Vector3 velocityDir = velocity.normalized;
+        int dir = (int)swingDirection;
+
+        Vector3 sideDir = Vector3.Cross(Vector3.up, velocityDir).normalized * dir;
+
+        Vector3 newDir = (velocityDir + sideDir * swingFactor * Time.fixedDeltaTime).normalized;
+
+        rb.linearVelocity = newDir * speed;
+
+        // Hard clamp (safety)
+        if (Mathf.Abs(transform.position.x) > pitchHalfWidth)
+        {
+            Vector3 v = rb.linearVelocity;
+            v.x = 0f;
+            rb.linearVelocity = v;
+
+            Vector3 p = transform.position;
+            p.x = Mathf.Sign(p.x) * pitchHalfWidth;
+            transform.position = p;
+        }
     }
 
+    // ------------------ SPIN ------------------
     void ApplySpin()
     {
         Vector3 velocity = rb.linearVelocity;
-
         float speed = velocity.magnitude;
 
-        // Define spin angle (in degrees)
-        float spinAngle = spinStrength * (int)spinDirection;
+        int dir = (int)spinDirection;
+        float finalAngle = spinAngle * dir;
 
-        // Rotate velocity around Y-axis
-        Quaternion spinRotation = Quaternion.AngleAxis(spinAngle, Vector3.up);
-
-        Vector3 newDir = spinRotation * velocity.normalized;
+        Quaternion rotation = Quaternion.AngleAxis(finalAngle, Vector3.up);
+        Vector3 newDir = rotation * velocity.normalized;
 
         rb.linearVelocity = newDir * speed;
     }
 
+    // ------------------ COLLISION ------------------
     private void OnCollisionEnter(Collision collision)
     {
         if (!hasBounced && collision.gameObject.CompareTag("Ground"))
         {
             hasBounced = true;
-
-            // Stop swing always
             isSwingActive = false;
 
-            // Apply spin ONLY if spin mode
+            Debug.Log("REAL BOUNCE: " + transform.position);
+
             if (ballType == BallType.Spin)
             {
                 ApplySpin();
             }
-
-            Debug.Log("Ball bounced");
         }
     }
 
-    private void OnDrawGizmos()
+    public float GetMinimumReachableDistance()
     {
-        float angleRad = launchAngleVertical * Mathf.Deg2Rad;
+        float gravity = Mathf.Abs(Physics.gravity.y);
 
-        Quaternion yawRotation = Quaternion.Euler(0f, launchAngleHorizontal, 0f);
-        Vector3 forward = yawRotation * transform.forward;
+        // Approximation: very steep angle (~80–85 degrees)
+        float steepAngle = 80f * Mathf.Deg2Rad;
 
-        Vector3 velocity = forward * speed * Mathf.Cos(angleRad);
-        velocity.y = speed * Mathf.Sin(angleRad);
+        float vx = speed * Mathf.Cos(steepAngle);
+        float vy = speed * Mathf.Sin(steepAngle);
 
-        Gizmos.color = Color.white;
-        Gizmos.DrawLine(transform.position, transform.position + velocity);
+        // Time to hit ground (same height assumption)
+        float time = (2 * vy) / gravity;
+
+        float minDistance = vx * time;
+
+        return minDistance;
+    }
+
+    public bool IsTargetReachable(Vector3 target)
+    {
+        Vector3 start = transform.position;
+
+        float gravity = Mathf.Abs(Physics.gravity.y);
+
+        Vector3 toTarget = target - start;
+        Vector3 toTargetXZ = new Vector3(toTarget.x, 0, toTarget.z);
+
+        float distanceXZ = toTargetXZ.magnitude;
+        float height = toTarget.y;
+
+        float speedSquared = speed * speed;
+
+        float underRoot = speedSquared * speedSquared -
+            gravity * (gravity * distanceXZ * distanceXZ + 2 * height * speedSquared);
+
+        return underRoot >= 0f;
     }
 }
