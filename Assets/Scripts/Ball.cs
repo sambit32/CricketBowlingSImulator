@@ -2,18 +2,38 @@ using UnityEngine;
 
 public class Ball : MonoBehaviour
 {
+    public enum BallType
+    {
+        Swing,
+        Spin
+    }
+
+    public enum Direction
+    {
+        Left = -1,
+        Right = 1
+    }
+
+    [Header("Ball Type")]
+    public BallType ballType = BallType.Swing;
+
     [Header("Throw Settings")]
     public float speed = 20f;
     public float launchAngleVertical = 10f;
     public float launchAngleHorizontal = 0f;
 
     [Header("Swing Settings")]
-    public float swingStrength = 2f;     // how strong the swing is
-    public int swingDirection = 1;       // +1 right, -1 left
-    public float maxSwing = 5f;          // clamp for realism
+    public float swingStrength = 2f;
+    public Direction swingDirection = Direction.Right;
+    public float maxSwing = 5f;
+
+    [Header("Spin Settings")]
+    [Tooltip("Spin angle in degrees")]
+    [Range(0f, 25f)]
+    public float spinStrength = 10f;
+    public Direction spinDirection = Direction.Right;
 
     private Rigidbody rb;
-
     private Vector3 initialPosition;
 
     private bool hasBounced = false;
@@ -29,18 +49,9 @@ public class Ball : MonoBehaviour
 
     public void ResetBall()
     {
-        // First enable physics temporarily to safely reset velocity
-        rb.isKinematic = false;
-
-        rb.linearVelocity = Vector3.zero;
-        rb.angularVelocity = Vector3.zero;
-
-        // Then disable physics
         rb.isKinematic = true;
-
         transform.position = initialPosition;
 
-        // Reset states
         hasBounced = false;
         isSwingActive = false;
         timeInAir = 0f;
@@ -52,7 +63,6 @@ public class Ball : MonoBehaviour
 
         float angleRad = launchAngleVertical * Mathf.Deg2Rad;
 
-        // Apply horizontal angle
         Quaternion yawRotation = Quaternion.Euler(0f, launchAngleHorizontal, 0f);
         Vector3 forward = yawRotation * transform.forward;
 
@@ -62,14 +72,14 @@ public class Ball : MonoBehaviour
         rb.isKinematic = false;
         rb.linearVelocity = velocity;
 
-        // Activate swing
-        isSwingActive = true;
+        // Activate swing only if swing mode
+        isSwingActive = (ballType == BallType.Swing);
         timeInAir = 0f;
     }
 
     void FixedUpdate()
     {
-        if (isSwingActive && !hasBounced)
+        if (ballType == BallType.Swing && isSwingActive && !hasBounced)
         {
             ApplySwing();
         }
@@ -79,16 +89,32 @@ public class Ball : MonoBehaviour
     {
         timeInAir += Time.fixedDeltaTime;
 
-        // Gradual increase
         float swingFactor = timeInAir * swingStrength;
         swingFactor = Mathf.Clamp(swingFactor, 0, maxSwing);
 
-        // Side direction (based on current movement, not transform)
         Vector3 velocityDir = rb.linearVelocity.normalized;
-        Vector3 sideDir = Vector3.Cross(Vector3.up, velocityDir).normalized * swingDirection;
 
-        // Apply small sideways force
+        // Perpendicular sideways direction
+        Vector3 sideDir = Vector3.Cross(Vector3.up, velocityDir).normalized * (int)swingDirection;
+
         rb.linearVelocity += sideDir * swingFactor * Time.fixedDeltaTime;
+    }
+
+    void ApplySpin()
+    {
+        Vector3 velocity = rb.linearVelocity;
+
+        float speed = velocity.magnitude;
+
+        // Define spin angle (in degrees)
+        float spinAngle = spinStrength * (int)spinDirection;
+
+        // Rotate velocity around Y-axis
+        Quaternion spinRotation = Quaternion.AngleAxis(spinAngle, Vector3.up);
+
+        Vector3 newDir = spinRotation * velocity.normalized;
+
+        rb.linearVelocity = newDir * speed;
     }
 
     private void OnCollisionEnter(Collision collision)
@@ -97,10 +123,16 @@ public class Ball : MonoBehaviour
         {
             hasBounced = true;
 
-            // STOP swing instantly
+            // Stop swing always
             isSwingActive = false;
 
-            Debug.Log("Ball bounced - swing stopped");
+            // Apply spin ONLY if spin mode
+            if (ballType == BallType.Spin)
+            {
+                ApplySpin();
+            }
+
+            Debug.Log("Ball bounced");
         }
     }
 
