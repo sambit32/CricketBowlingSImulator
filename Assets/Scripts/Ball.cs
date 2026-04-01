@@ -41,6 +41,8 @@ public class Ball : MonoBehaviour
     private bool isSwingActive = false;
     private float timeInAir = 0f;
 
+    BounceMarker bounceMarkerComp;
+
     [SerializeField] private TrailRenderer trailRenderer;
 
     public event Action OnCurrentDirectionChange;
@@ -54,6 +56,8 @@ public class Ball : MonoBehaviour
 
         if (sphereCollider == null) sphereCollider = GetComponent<SphereCollider>();
         if (originalMaterial == null) originalMaterial = sphereCollider != null ? sphereCollider.material : null;
+
+        if(bounceMarkerComp == null) bounceMarkerComp = bounceMarker.GetComponent<BounceMarker>();
 
         ResetBall();
         UpdateBounceMarker();
@@ -132,6 +136,7 @@ public class Ball : MonoBehaviour
     public void ResetBall()
     {
         trailRenderer.Clear();
+        trailRenderer.enabled = false;
         rb.isKinematic = true;
         transform.position = initialPosition;
 
@@ -141,9 +146,15 @@ public class Ball : MonoBehaviour
         trailRenderer.Clear();
     }
     [SerializeField] private Vector3 LaunchVelocity = Vector3.zero;
+
+    public bool CanLaunch()
+    {
+        return bounceMarkerComp.Correct;
+    }
     public void LaunchBall()
     {
         ResetBall();
+        trailRenderer.enabled = true;
         Vector3 velocity = CalculateLaunchVelocity();
 
         LaunchVelocity = velocity; // For debugging/visualization
@@ -217,7 +228,7 @@ public class Ball : MonoBehaviour
                 // Smooth reduction near pitch edges
                 float distanceFromCenter = Mathf.Abs(pos.x);
                 float t = Mathf.InverseLerp(pitchHalfWidth, 0f, distanceFromCenter);
-                float edgeFactor = Mathf.SmoothStep(0f, 1f, t);
+                float edgeFactor = Mathf.Pow(t, 2f); // try 2, 3, or 4
                 swingFactor *= edgeFactor;
 
                 Vector3 velocityDir = vel.normalized;
@@ -270,7 +281,7 @@ public class Ball : MonoBehaviour
         // Smooth edge reduction
         float distanceFromCenter = Mathf.Abs(transform.position.x);
         float t = Mathf.InverseLerp(pitchHalfWidth, 0f, distanceFromCenter);
-        float edgeFactor = Mathf.SmoothStep(0f, 1f, t);
+        float edgeFactor = Mathf.Pow(t, 2f); // try 2, 3, or 4
         swingFactor *= edgeFactor;
 
         Vector3 velocity = rb.linearVelocity;

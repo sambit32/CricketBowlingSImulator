@@ -99,6 +99,8 @@ public class BallManager : MonoBehaviour
     public void Bowl()
     {
         if (OnCooldown) return; // Prevent bowling while on cooldown)
+
+        if(!ball.CanLaunch()) return;
         accuracy = accuracyMeter.GetCurrentAccuracy();
         ball.LaunchBall();
         StartCoroutine(ResetBallAfterDelay(2.5f)); // Reset ball after 2 seconds, adjust as needed
