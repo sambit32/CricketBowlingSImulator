@@ -5934,7 +5934,7 @@ PrefabInstance:
       objectReference: {fileID: 459001873}
     - target: {fileID: 871500151644019349, guid: 2080945a9772e654c9430f22ef5ac5f8, type: 3}
       propertyPath: spinAngle
-      value: 45
+      value: 30
       objectReference: {fileID: 0}
     - target: {fileID: 871500151644019349, guid: 2080945a9772e654c9430f22ef5ac5f8, type: 3}
       propertyPath: bounceMarker
