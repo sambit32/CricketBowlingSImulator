@@ -5921,6 +5921,10 @@ PrefabInstance:
       value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 871500151644019349, guid: 2080945a9772e654c9430f22ef5ac5f8, type: 3}
+      propertyPath: friction
+      value: 4
+      objectReference: {fileID: 0}
+    - target: {fileID: 871500151644019349, guid: 2080945a9772e654c9430f22ef5ac5f8, type: 3}
       propertyPath: maxSwing
       value: 4
       objectReference: {fileID: 0}
@@ -5929,9 +5933,17 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 459001873}
     - target: {fileID: 871500151644019349, guid: 2080945a9772e654c9430f22ef5ac5f8, type: 3}
+      propertyPath: spinAngle
+      value: 45
+      objectReference: {fileID: 0}
+    - target: {fileID: 871500151644019349, guid: 2080945a9772e654c9430f22ef5ac5f8, type: 3}
       propertyPath: bounceMarker
       value: 
       objectReference: {fileID: 1425262039}
+    - target: {fileID: 871500151644019349, guid: 2080945a9772e654c9430f22ef5ac5f8, type: 3}
+      propertyPath: bounceDamping
+      value: 0.4
+      objectReference: {fileID: 0}
     - target: {fileID: 871500151644019349, guid: 2080945a9772e654c9430f22ef5ac5f8, type: 3}
       propertyPath: swingStrength
       value: 3
