@@ -103,12 +103,15 @@ MonoBehaviour:
   swingStrength: 2
   swingDirection: -1
   maxSwing: 3
-  spinAngle: 15
+  spinAngle: 20
   spinDirection: 1
   pitchHalfWidth: 1.5
   simulationTimeStep: 0.02
   simulationSteps: 500
   groundY: 0
+  rb: {fileID: 5551024249713704943}
+  sphereCollider: {fileID: 351181676067093430}
+  trailRenderer: {fileID: 4342933032520802630}
   LaunchVelocity: {x: 0, y: 0, z: 0}
 --- !u!96 &4342933032520802630
 TrailRenderer:
@@ -159,7 +162,7 @@ TrailRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_MaskInteraction: 0
-  m_Time: 5
+  m_Time: 2.5
   m_PreviewTimeScale: 1
   m_Parameters:
     serializedVersion: 3

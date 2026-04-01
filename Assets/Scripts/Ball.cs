@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 public class Ball : MonoBehaviour
@@ -31,23 +32,81 @@ public class Ball : MonoBehaviour
     public int simulationSteps = 500;
     public float groundY = 0f;
 
-    private Rigidbody rb;
+    [SerializeField] private Rigidbody rb;
     private Vector3 initialPosition;
-    private SphereCollider sphereCollider;
+    [SerializeField] private SphereCollider sphereCollider;
     private PhysicsMaterial originalMaterial;
 
     private bool hasBounced = false;
     private bool isSwingActive = false;
     private float timeInAir = 0f;
 
-    void Start()
+    [SerializeField] private TrailRenderer trailRenderer;
+
+    public event Action OnCurrentDirectionChange;
+    public event Action<BallType> OnBallTypeChange;
+    public void Initialize(BallData ballData)
     {
-        rb = GetComponent<Rigidbody>();
-        initialPosition = transform.position;
+        if (rb == null) rb = GetComponent<Rigidbody>();
+        initialPosition = ballData.position;
+        swingDirection = ballData.idealSwingDirection;
         rb.isKinematic = true;
-        sphereCollider = GetComponent<SphereCollider>();
-        originalMaterial = sphereCollider != null ? sphereCollider.material : null;
+
+        if (sphereCollider == null) sphereCollider = GetComponent<SphereCollider>();
+        if (originalMaterial == null) originalMaterial = sphereCollider != null ? sphereCollider.material : null;
+
+        ResetBall();
         UpdateBounceMarker();
+
+        OnCurrentDirectionChange?.Invoke();
+
+        OnBallTypeChange?.Invoke(ballType);
+    }
+
+    public void ChangeBallType(BallType ballType)
+    {
+        this.ballType = ballType;
+
+        if (sphereCollider != null)
+        {
+            if(ballType == BallType.Swing)
+            {
+                sphereCollider.material = null;
+            }
+            else
+            {
+                sphereCollider.material = originalMaterial;
+            }
+        }
+
+        OnCurrentDirectionChange?.Invoke();
+        OnBallTypeChange?.Invoke(ballType);
+    }
+
+    public void ChangeBallTypeDirection()
+    {
+        if (ballType == BallType.Swing)
+        {
+            swingDirection = swingDirection == Direction.Left ? Direction.Right : Direction.Left;
+        }
+        else if (ballType == BallType.Spin)
+        {
+            spinDirection = spinDirection == Direction.Left ? Direction.Right : Direction.Left;
+        }
+
+        OnCurrentDirectionChange?.Invoke();
+    }
+
+    public Direction GetCurrentDirection()
+    {
+        if (ballType == BallType.Swing)
+        {
+            return swingDirection;
+        }
+        else
+        {
+            return spinDirection;
+        }
     }
 
     void Update()
@@ -72,28 +131,19 @@ public class Ball : MonoBehaviour
 
     public void ResetBall()
     {
+        trailRenderer.Clear();
         rb.isKinematic = true;
         transform.position = initialPosition;
 
         hasBounced = false;
         isSwingActive = false;
         timeInAir = 0f;
+        trailRenderer.Clear();
     }
     [SerializeField] private Vector3 LaunchVelocity = Vector3.zero;
     public void LaunchBall()
     {
         ResetBall();
-        if(sphereCollider != null)
-        {
-            if(ballType == BallType.Swing)
-            {
-                sphereCollider.material = null;
-            }
-            else
-            {
-                sphereCollider.material = originalMaterial;
-            }
-        }
         Vector3 velocity = CalculateLaunchVelocity();
 
         LaunchVelocity = velocity; // For debugging/visualization
@@ -214,7 +264,7 @@ public class Ball : MonoBehaviour
     {
         timeInAir += Time.fixedDeltaTime;
 
-        float swingFactor = timeInAir * swingStrength;
+        float swingFactor = timeInAir * swingStrength * BallManager.Instance.Accuracy;
         swingFactor = Mathf.Clamp(swingFactor, 0, maxSwing);
 
         // Smooth edge reduction
@@ -255,7 +305,7 @@ public class Ball : MonoBehaviour
         float speed = velocity.magnitude;
 
         int dir = (int)spinDirection;
-        float finalAngle = spinAngle * dir;
+        float finalAngle = spinAngle * dir * BallManager.Instance.Accuracy;
 
         Quaternion rotation = Quaternion.AngleAxis(finalAngle, Vector3.up);
         Vector3 newDir = rotation * velocity.normalized;
@@ -278,24 +328,6 @@ public class Ball : MonoBehaviour
                 ApplySpin();
             }
         }
-    }
-
-    public float GetMinimumReachableDistance()
-    {
-        float gravity = Mathf.Abs(Physics.gravity.y);
-
-        // Approximation: very steep angle (~80–85 degrees)
-        float steepAngle = 80f * Mathf.Deg2Rad;
-
-        float vx = speed * Mathf.Cos(steepAngle);
-        float vy = speed * Mathf.Sin(steepAngle);
-
-        // Time to hit ground (same height assumption)
-        float time = (2 * vy) / gravity;
-
-        float minDistance = vx * time;
-
-        return minDistance;
     }
 
     public bool IsTargetReachable(Vector3 target)

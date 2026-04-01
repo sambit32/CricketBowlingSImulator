@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using UnityEngine;
 
 public class AimTargetController : MonoBehaviour
@@ -10,8 +9,9 @@ public class AimTargetController : MonoBehaviour
 
     void Update()
     {
-        float h = Input.GetAxis("Horizontal"); // A/D
-        float v = Input.GetAxis("Vertical");   // W/S
+        Vector2 input = InputManager.Instance.GetMoveInput();
+        float h = input.x; // A/D
+        float v = input.y;   // W/S
 
         Vector3 move = new Vector3(h, 0f, v);
 
